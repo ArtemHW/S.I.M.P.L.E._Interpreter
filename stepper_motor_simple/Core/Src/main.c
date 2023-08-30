@@ -421,7 +421,8 @@ void interpreter(void const * argument)
 			}
 			break;
 		case 'S':
-			uint16_t speed_value = 0;
+			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break;
+			uint16_t start_speed_value = 0;
 			char temp = 0;
 			for(int i = 0; i < 4; i++){
 				xQueueReceive(uart_queue_rx, &temp, 5);
@@ -430,8 +431,14 @@ void interpreter(void const * argument)
 				if ((temp & (1<<7)) == 0x80){
 					temp &= ~(1<<7);
 			    }
-				speed_value = (speed_value*10) + (temp - 48);
+				start_speed_value = (start_speed_value*10) + (temp - 48);
 			}
+			uint32_t base = 1000000/start_speed_value;
+			  TIM3->ARR = base;
+			  TIM3->CCR1 = (uint16_t) base*0.99;
+			  TIM3->CCR2 = (uint16_t) base*0.99;
+			  TIM3->CCR3 = (uint16_t) base*0.99;
+			  TIM3->CCR4 = (uint16_t) base*0.99;
 			__asm__ volatile("NOP");
 			break;
 	    case 0:

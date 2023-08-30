@@ -5,7 +5,7 @@
 ../Core/Src/main.c:328:13:MX_GPIO_Init	1
 ../Core/Src/main.c:343:6:uart1_rx_callback	1
 ../Core/Src/main.c:370:6:programing_mode	1
-../Core/Src/main.c:391:6:interpreter	14
-../Core/Src/main.c:455:6:uart_comunication	1
-../Core/Src/main.c:474:6:HAL_TIM_PeriodElapsedCallback	8
-../Core/Src/main.c:521:6:Error_Handler	1
+../Core/Src/main.c:391:6:interpreter	15
+../Core/Src/main.c:462:6:uart_comunication	1
+../Core/Src/main.c:481:6:HAL_TIM_PeriodElapsedCallback	8
+../Core/Src/main.c:528:6:Error_Handler	1
