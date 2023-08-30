@@ -51,6 +51,12 @@ osThreadId UART_comunicationHandle;
 /* USER CODE BEGIN PV */
 uint8_t counter_for_steps = 0;
 QueueHandle_t uart_queue_rx;
+
+EventGroupHandle_t EventGroup;
+/* Event Group description
+ *  0x80 Programming mode for GS-200S
+ *
+ */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -123,6 +129,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+  EventGroup = xEventGroupCreate();
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -366,10 +373,10 @@ void programing_mode(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
-    char pData;
-	xQueueReceive(uart_queue_rx, &pData, 100);
-	HAL_UART_Transmit(&huart1, &pData, 1, 10);
+	  xEventGroupWaitBits(EventGroup, 0x80, pdFALSE, pdTRUE, portMAX_DELAY);
+	  HAL_UART_Transmit(&huart1, "Programming mode", 17, 100);
+	  vTaskDelay(200);
+
   }
   /* USER CODE END 5 */
 }
@@ -384,10 +391,56 @@ void programing_mode(void const * argument)
 void interpreter(void const * argument)
 {
   /* USER CODE BEGIN interpreter */
+	char pData;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  xQueueReceive(uart_queue_rx, &pData, portMAX_DELAY);
+	  HAL_UART_Transmit(&huart1, &pData, 1, 10);
+	  if ((pData & (1<<7)) == 0x80){
+		  pData &= ~(1<<7);
+	  }
+	  __asm__ volatile("NOP");
+	  switch (pData) {
+		case 'P':
+			xQueueReceive(uart_queue_rx, &pData, 5);
+			HAL_UART_Transmit(&huart1, &pData, 1, 10);
+				  if ((pData & (1<<7)) == 0x80){
+					  pData &= ~(1<<7);
+				  }
+			__asm__ volatile("NOP");
+			switch (pData) {
+				case 'o':
+					xEventGroupSetBits(EventGroup, 0x80);
+					break;
+				case 'x':
+					xEventGroupClearBits(EventGroup, 0x80);
+					break;
+				default:
+					break;
+			}
+			break;
+		case 'S':
+			uint16_t speed_value = 0;
+			char temp = 0;
+			for(int i = 0; i < 4; i++){
+				xQueueReceive(uart_queue_rx, &temp, 5);
+				if((temp == 13) || (temp == 0)) break;
+				if(i == 3) break;
+				if ((temp & (1<<7)) == 0x80){
+					temp &= ~(1<<7);
+			    }
+				speed_value = (speed_value*10) + (temp - 48);
+			}
+			__asm__ volatile("NOP");
+			break;
+	    case 0:
+			break;
+		default:
+			break;
+	}
+
+	  pData = 0;
   }
   /* USER CODE END interpreter */
 }
