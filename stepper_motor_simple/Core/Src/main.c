@@ -48,15 +48,23 @@ UART_HandleTypeDef huart1;
 osThreadId ProgramingModeHandle;
 osThreadId InterpreterHandle;
 osThreadId UART_comunicationHandle;
+osThreadId ExecutionFromMemoryHandle;
 /* USER CODE BEGIN PV */
 uint8_t counter_for_steps = 0;
 QueueHandle_t uart_queue_rx;
+struct exm_type{
+	char execution_memory[119]; //Program storage capability of GS-C200S
+	uint8_t position;
+	uint8_t start_of_instruction;
+	uint8_t size_of_instruction;
+}exm;
 
 EventGroupHandle_t EventGroup;
 /* Event Group description
  *  0x80 Programming mode for GS-200S
- *
+ *	0x40 Execution mode
  */
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,6 +75,7 @@ static void MX_USART1_UART_Init(void);
 void programing_mode(void const * argument);
 void interpreter(void const * argument);
 void uart_comunication(void const * argument);
+void execution_from_memory(void const * argument);
 
 /* USER CODE BEGIN PFP */
 void uart1_rx_callback();
@@ -85,6 +94,12 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	counter_for_steps = 0;
+	for(int i = 0; i < sizeof(exm.execution_memory); i++){
+		exm.execution_memory[i] = 0;
+	}
+	exm.position = 0;
+	exm.size_of_instruction = 0;
+	exm.start_of_instruction = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -130,6 +145,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
   EventGroup = xEventGroupCreate();
+  xEventGroupSetBits(EventGroup, 0x40); // Start the Execution mode
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -154,6 +170,10 @@ int main(void)
   /* definition and creation of UART_comunication */
   osThreadDef(UART_comunication, uart_comunication, osPriorityNormal, 0, 160);
   UART_comunicationHandle = osThreadCreate(osThread(UART_comunication), NULL);
+
+  /* definition and creation of ExecutionFromMemory */
+  osThreadDef(ExecutionFromMemory, execution_from_memory, osPriorityNormal, 0, 500);
+  ExecutionFromMemoryHandle = osThreadCreate(osThread(ExecutionFromMemory), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -397,7 +417,7 @@ void interpreter(void const * argument)
   {
 	  xQueueReceive(uart_queue_rx, &pData, portMAX_DELAY);
 	  HAL_UART_Transmit(&huart1, &pData, 1, 10);
-	  if ((pData & (1<<7)) == 0x80){
+	  if ((pData & (1<<7)) == 0x80){  //Check odd parity
 		  pData &= ~(1<<7);
 	  }
 	  __asm__ volatile("NOP");
@@ -405,35 +425,41 @@ void interpreter(void const * argument)
 		case 'P':
 			xQueueReceive(uart_queue_rx, &pData, 5);
 			HAL_UART_Transmit(&huart1, &pData, 1, 10);
-				  if ((pData & (1<<7)) == 0x80){
+				  if ((pData & (1<<7)) == 0x80){ //Check odd parity
 					  pData &= ~(1<<7);
 				  }
 			__asm__ volatile("NOP");
 			switch (pData) {
 				case 'o':
+					xEventGroupClearBits(EventGroup, 0x40);
 					xEventGroupSetBits(EventGroup, 0x80);
 					break;
 				case 'x':
 					xEventGroupClearBits(EventGroup, 0x80);
+					xEventGroupSetBits(EventGroup, 0x40);
 					break;
 				default:
 					break;
 			}
 			break;
+	    case 'E':
+	    	xEventGroupClearBits(EventGroup, 0x80);
+	    	xEventGroupSetBits(EventGroup, 0x40);
+	    	break;
 		case 'S':
-			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break;
+			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
 			uint16_t start_speed_value = 0;
 			char temp = 0;
 			for(int i = 0; i < 4; i++){
 				xQueueReceive(uart_queue_rx, &temp, 5);
-				if((temp == 13) || (temp == 0)) break;
+				if((temp == 13) || (temp == 0) || (i == 3)) break;
 				if(i == 3) break;
 				if ((temp & (1<<7)) == 0x80){
 					temp &= ~(1<<7);
 			    }
 				start_speed_value = (start_speed_value*10) + (temp - 48);
 			}
-			uint32_t base = 1000000/start_speed_value;
+			uint32_t base = 1000000/start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
 			  TIM3->ARR = base;
 			  TIM3->CCR1 = (uint16_t) base*0.99;
 			  TIM3->CCR2 = (uint16_t) base*0.99;
@@ -468,6 +494,26 @@ void uart_comunication(void const * argument)
 
   }
   /* USER CODE END uart_comunication */
+}
+
+/* USER CODE BEGIN Header_execution_from_memory */
+/**
+* @brief Function implementing the ExecutionFromMemory thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_execution_from_memory */
+void execution_from_memory(void const * argument)
+{
+  /* USER CODE BEGIN execution_from_memory */
+  /* Infinite loop */
+  for(;;)
+  {
+	  xEventGroupWaitBits(EventGroup, 0x40, pdFALSE, pdTRUE, portMAX_DELAY);
+	  HAL_UART_Transmit(&huart1, "Execution mode", 15, 100);
+	  vTaskDelay(200);
+  }
+  /* USER CODE END execution_from_memory */
 }
 
 /**
