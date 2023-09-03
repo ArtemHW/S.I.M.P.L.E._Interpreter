@@ -52,12 +52,18 @@ osThreadId ExecutionFromMemoryHandle;
 /* USER CODE BEGIN PV */
 uint8_t counter_for_steps = 0;
 QueueHandle_t uart_queue_rx;
+//QueueHandle_t instruction_S_value;
+
 struct exm_type{
 	char execution_memory[119]; //Program storage capability of GS-C200S
 	uint8_t position;
 	uint8_t start_of_instruction;
 	uint8_t size_of_instruction;
+	uint16_t start_speed_value;
+
+	void (*function_pointer_S)(void);
 }exm;
+
 
 EventGroupHandle_t EventGroup;
 /* Event Group description
@@ -79,6 +85,7 @@ void execution_from_memory(void const * argument);
 
 /* USER CODE BEGIN PFP */
 void uart1_rx_callback();
+void function_of_S();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,12 +101,14 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	counter_for_steps = 0;
+
 	for(int i = 0; i < sizeof(exm.execution_memory); i++){
 		exm.execution_memory[i] = 0;
 	}
 	exm.position = 0;
 	exm.size_of_instruction = 0;
 	exm.start_of_instruction = 0;
+	exm.function_pointer_S = function_of_S;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -155,6 +164,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   uart_queue_rx = xQueueCreate(10, 1);
+  //instruction_S_value = xQueueCreate(5, 2);
 
   /* USER CODE END RTOS_QUEUES */
 
@@ -367,15 +377,15 @@ void uart1_rx_callback(void)
 
 }
 
-//void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-//{
-//	__asm__ volatile("NOP");
-//}
-//
-//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-//{
-//	__asm__ volatile("NOP");
-//}
+void function_of_S(){
+	uint32_t base = 1000000/exm.start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
+	  TIM3->ARR = base;
+	  TIM3->CCR1 = (uint16_t) base*0.99;
+	  TIM3->CCR2 = (uint16_t) base*0.99;
+	  TIM3->CCR3 = (uint16_t) base*0.99;
+	  TIM3->CCR4 = (uint16_t) base*0.99;
+	__asm__ volatile("NOP");
+}
 
 
 /* USER CODE END 4 */
@@ -448,7 +458,7 @@ void interpreter(void const * argument)
 	    	break;
 		case 'S':
 			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
-			uint16_t start_speed_value = 0;
+			exm.start_speed_value = 0;
 			char temp = 0;
 			for(int i = 0; i < 4; i++){
 				xQueueReceive(uart_queue_rx, &temp, 5);
@@ -457,14 +467,9 @@ void interpreter(void const * argument)
 				if ((temp & (1<<7)) == 0x80){
 					temp &= ~(1<<7);
 			    }
-				start_speed_value = (start_speed_value*10) + (temp - 48);
+				exm.start_speed_value = (exm.start_speed_value*10) + (temp - 48);
 			}
-			uint32_t base = 1000000/start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
-			  TIM3->ARR = base;
-			  TIM3->CCR1 = (uint16_t) base*0.99;
-			  TIM3->CCR2 = (uint16_t) base*0.99;
-			  TIM3->CCR3 = (uint16_t) base*0.99;
-			  TIM3->CCR4 = (uint16_t) base*0.99;
+			//exm.
 			__asm__ volatile("NOP");
 			break;
 	    case 0:
@@ -511,6 +516,8 @@ void execution_from_memory(void const * argument)
   {
 	  xEventGroupWaitBits(EventGroup, 0x40, pdFALSE, pdTRUE, portMAX_DELAY);
 	  HAL_UART_Transmit(&huart1, "Execution mode", 15, 100);
+
+
 	  vTaskDelay(200);
   }
   /* USER CODE END execution_from_memory */
