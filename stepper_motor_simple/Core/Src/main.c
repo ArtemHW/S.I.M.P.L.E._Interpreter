@@ -56,7 +56,7 @@ QueueHandle_t uart_queue_rx;
 
 struct exm_type{
 	char execution_memory[119]; //Program storage capability of GS-C200S
-	uint8_t position;
+	uint8_t memory_pointer;
 	uint8_t start_of_instruction;
 	uint8_t size_of_instruction;
 	uint16_t start_speed_value;
@@ -86,6 +86,8 @@ void execution_from_memory(void const * argument);
 /* USER CODE BEGIN PFP */
 void uart1_rx_callback();
 void function_of_S();
+void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
+void erase_exm();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -105,7 +107,7 @@ int main(void)
 	for(int i = 0; i < sizeof(exm.execution_memory); i++){
 		exm.execution_memory[i] = 0;
 	}
-	exm.position = 0;
+	exm.memory_pointer = 0;
 	exm.size_of_instruction = 0;
 	exm.start_of_instruction = 0;
 	exm.function_pointer_S = function_of_S;
@@ -377,6 +379,19 @@ void uart1_rx_callback(void)
 
 }
 
+void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data){
+	for(int i = 0; i < size_of_data; i++){
+		exm.execution_memory[exm.memory_pointer] = start_of_data[i];
+		exm.memory_pointer++;
+	}
+}
+
+void erase_exm(){
+	for(int i = 0; i < sizeof(exm.execution_memory); i++){
+		exm.execution_memory[i] = 0;
+	}
+}
+
 void function_of_S(){
 	uint32_t base = 1000000/exm.start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
 	  TIM3->ARR = base;
@@ -442,10 +457,13 @@ void interpreter(void const * argument)
 			switch (pData) {
 				case 'o':
 					xEventGroupClearBits(EventGroup, 0x40);
+					exm.memory_pointer = 0;
+					erase_exm();
 					xEventGroupSetBits(EventGroup, 0x80);
 					break;
 				case 'x':
 					xEventGroupClearBits(EventGroup, 0x80);
+					exm.memory_pointer = 0;
 					xEventGroupSetBits(EventGroup, 0x40);
 					break;
 				default:
@@ -454,6 +472,7 @@ void interpreter(void const * argument)
 			break;
 	    case 'E':
 	    	xEventGroupClearBits(EventGroup, 0x80);
+	    	exm.memory_pointer = 0;
 	    	xEventGroupSetBits(EventGroup, 0x40);
 	    	break;
 		case 'S':
@@ -469,6 +488,8 @@ void interpreter(void const * argument)
 			    }
 				exm.start_speed_value = (exm.start_speed_value*10) + (temp - 48);
 			}
+			uint8_t data[4] = {'S', (uint8_t)(exm.start_speed_value), (uint8_t)((exm.start_speed_value>>8)), 0};
+			write_to_exm(data, sizeof(data));
 			//exm.
 			__asm__ volatile("NOP");
 			break;
