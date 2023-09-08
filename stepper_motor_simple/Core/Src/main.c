@@ -88,6 +88,7 @@ void uart1_rx_callback();
 void function_of_S();
 void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
 void erase_exm();
+void perform_instruction_from_exm();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -392,6 +393,10 @@ void erase_exm(){
 	}
 }
 
+void perform_instruction_from_exm(){
+
+}
+
 void function_of_S(){
 	uint32_t base = 1000000/exm.start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
 	  TIM3->ARR = base;
@@ -537,6 +542,7 @@ void execution_from_memory(void const * argument)
   {
 	  xEventGroupWaitBits(EventGroup, 0x40, pdFALSE, pdTRUE, portMAX_DELAY);
 	  HAL_UART_Transmit(&huart1, "Execution mode", 15, 100);
+	  perform_instruction_from_exm();
 
 
 	  vTaskDelay(200);
