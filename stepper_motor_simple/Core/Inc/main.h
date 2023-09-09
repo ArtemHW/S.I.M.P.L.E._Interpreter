@@ -59,6 +59,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define ENA_stepper_Pin GPIO_PIN_9
+#define ENA_stepper_GPIO_Port GPIOC
+#define PUL_stepper_Pin GPIO_PIN_8
+#define PUL_stepper_GPIO_Port GPIOB
+#define DIR_stepper_Pin GPIO_PIN_9
+#define DIR_stepper_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
