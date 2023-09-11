@@ -61,8 +61,8 @@ struct exm_type{
 	uint8_t* sizes_pointer;
 	char current_instruction[4];
 	uint16_t start_speed_value;
-
-	void (*function_pointer_S)(void);
+	uint16_t top_speed_value;
+	uint16_t ramp_value;
 }exm;
 
 
@@ -90,7 +90,6 @@ void exit_programing();
 void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
 void read_from_exm();
 void erase_exm();
-void function_of_S();
 
 /* USER CODE END PFP */
 
@@ -118,7 +117,9 @@ int main(void)
 	for(int i = 0; i < sizeof(exm.current_instruction); i++){
 		exm.current_instruction[i] = 0;
 	}
-	exm.function_pointer_S = function_of_S;
+	exm.start_speed_value = 0;
+	exm.top_speed_value = 0;
+	exm.ramp_value = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -378,6 +379,11 @@ void exit_programing()
 	xEventGroupClearBits(EventGroup, 0x80);
 	exm.memory_pointer = exm.execution_memory;
 	exm.sizes_pointer = exm.sizes_of_instruction;
+
+	exm.start_speed_value = 0;
+	exm.top_speed_value = 0;
+	exm.ramp_value = 0;
+
 	xEventGroupSetBits(EventGroup, 0x40);
 }
 
@@ -432,17 +438,6 @@ void erase_exm()
 	}
 }
 
-
-void function_of_S()
-{
-//	uint32_t base = 1000000/exm.start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
-//	  TIM3->ARR = base;
-//	  TIM3->CCR1 = (uint16_t) base*0.99;
-//	  TIM3->CCR2 = (uint16_t) base*0.99;
-//	  TIM3->CCR3 = (uint16_t) base*0.99;
-//	  TIM3->CCR4 = (uint16_t) base*0.99;
-	__asm__ volatile("NOP");
-}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_programing_mode */
@@ -465,8 +460,16 @@ void programing_mode(void const * argument)
 	  xQueueReceive(programing_queue, &instruction_for_programing, portMAX_DELAY);
 	  switch (instruction_for_programing) {
 		case 'S':
-			uint8_t data[4] = {'S', (uint8_t)(exm.start_speed_value), (uint8_t)((exm.start_speed_value>>8)), 0};
-			write_to_exm(data, sizeof(data));
+			uint8_t data1[4] = {'S', (uint8_t)(exm.start_speed_value), (uint8_t)((exm.start_speed_value>>8)), 0};
+			write_to_exm(data1, sizeof(data1));
+			break;
+		case 'T':
+			uint8_t data2[4] = {'T', (uint8_t)(exm.top_speed_value), (uint8_t)((exm.top_speed_value>>8)), 0};
+			write_to_exm(data2, sizeof(data2));
+			break;
+		case 'R':
+			uint8_t data3[4] = {'R', (uint8_t)(exm.ramp_value), (uint8_t)((exm.ramp_value>>8)), 0};
+			write_to_exm(data3, sizeof(data3));
 			break;
 		default:
 			break;
@@ -495,6 +498,7 @@ void interpreter(void const * argument)
 		  pData &= ~(1<<7);
 	  }
 	  __asm__ volatile("NOP");
+	  char temp = 0;
 	  switch (pData) {
 		case 'P':
 			xQueueReceive(uart_queue_rx, &pData, 5);
@@ -530,12 +534,12 @@ void interpreter(void const * argument)
 		case 'S':
 			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
 			exm.start_speed_value = 0;
-			char temp = 0;
+			temp = 0;
 			for(int i = 0; i < 4; i++){
 				xQueueReceive(uart_queue_rx, &temp, 5);
 				if((temp == 13) || (temp == 0) || (i == 3)) break;
 				if(i == 3) break;
-				if ((temp & (1<<7)) == 0x80){
+				if ((temp & (1<<7)) == 0x80){ //Check odd parity
 					temp &= ~(1<<7);
 			    }
 				exm.start_speed_value = (exm.start_speed_value*10) + (temp - 48);
@@ -544,6 +548,38 @@ void interpreter(void const * argument)
 //			write_to_exm(data, sizeof(data));
 			xQueueSendToBack(programing_queue, (void*)"S", 100);
 			//exm.
+			__asm__ volatile("NOP");
+			break;
+		case 'T':
+			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
+			exm.top_speed_value = 0;
+			temp = 0;
+			for(int i = 0; i < 4; i++){
+				xQueueReceive(uart_queue_rx, &temp, 5);
+				if((temp == 13) || (temp == 0) || (i == 3)) break;
+				if(i == 3) break;
+				if ((temp & (1<<7)) == 0x80){ //Check odd parity
+					temp &= ~(1<<7);
+			    }
+				exm.top_speed_value = (exm.top_speed_value*10) + (temp - 48);
+			}
+			xQueueSendToBack(programing_queue, (void*)"T", 100);
+			__asm__ volatile("NOP");
+			break;
+		case 'R':
+			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
+			exm.ramp_value = 0;
+			temp = 0;
+			for(int i = 0; i < 4; i++){
+				xQueueReceive(uart_queue_rx, &temp, 5);
+				if((temp == 13) || (temp == 0) || (i == 3)) break;
+				if(i == 3) break;
+				if ((temp & (1<<7)) == 0x80){ //Check odd parity
+					temp &= ~(1<<7);
+			    }
+				exm.ramp_value = (exm.ramp_value*10) + (temp - 48);
+			}
+			xQueueSendToBack(programing_queue, (void*)"R", 100);
 			__asm__ volatile("NOP");
 			break;
 	    case 0:
@@ -594,7 +630,22 @@ void execution_from_memory(void const * argument)
 	  HAL_UART_Transmit(&huart1, "Execution mode", 15, 100);
 	  read_from_exm();
 	  HAL_UART_Transmit(&huart1, exm.current_instruction, sizeof(exm.current_instruction), 100);
-
+	  switch (exm.current_instruction[0]) {
+		case 'S':
+			exm.start_speed_value = 0;
+			exm.start_speed_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8);
+			break;
+		case 'T':
+			exm.top_speed_value = 0;
+			exm.top_speed_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8);
+			break;
+		case 'R':
+			exm.ramp_value = 0;
+			exm.ramp_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8);
+			break;
+		default:
+			break;
+	}
 	  vTaskDelay(200);
   }
   /* USER CODE END execution_from_memory */
