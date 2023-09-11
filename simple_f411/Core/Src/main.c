@@ -56,9 +56,10 @@ QueueHandle_t programing_queue;
 
 struct exm_type{
 	char execution_memory[119]; //Program storage capability of GS-C200S
-	uint8_t memory_pointer;
-	uint8_t start_of_instruction;
-	uint8_t size_of_instruction;
+	char* memory_pointer;
+	uint8_t sizes_of_instruction[60];
+	uint8_t* sizes_pointer;
+	char current_instruction[4];
 	uint16_t start_speed_value;
 
 	void (*function_pointer_S)(void);
@@ -84,12 +85,13 @@ void execution_from_memory(void const * argument);
 
 /* USER CODE BEGIN PFP */
 void uart1_rx_callback();
-void function_of_S();
-void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
-void erase_exm();
-void perform_instruction_from_exm();
 void enter_programing();
 void exit_programing();
+void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
+void read_from_exm();
+void erase_exm();
+void function_of_S();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -108,9 +110,14 @@ int main(void)
 	for(int i = 0; i < sizeof(exm.execution_memory); i++){
 		exm.execution_memory[i] = 0;
 	}
-	exm.memory_pointer = 0;
-	exm.size_of_instruction = 0;
-	exm.start_of_instruction = 0;
+	exm.memory_pointer = exm.execution_memory;
+	for(int i = 0; i < sizeof(exm.sizes_of_instruction); i++){
+		exm.sizes_of_instruction[i] = 1;
+	}
+	exm.sizes_pointer = exm.sizes_of_instruction;
+	for(int i = 0; i < sizeof(exm.current_instruction); i++){
+		exm.current_instruction[i] = 0;
+	}
 	exm.function_pointer_S = function_of_S;
   /* USER CODE END 1 */
 
@@ -160,7 +167,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
-  uart_queue_rx = xQueueCreate(10, 1);
+  uart_queue_rx = xQueueCreate(32, 1);
   programing_queue = xQueueCreate(64, 1);
   /* USER CODE END RTOS_QUEUES */
 
@@ -357,37 +364,77 @@ void uart1_rx_callback(void)
 
 }
 
-void enter_programing(){
+void enter_programing()
+{
 	xEventGroupClearBits(EventGroup, 0x40);
-	exm.memory_pointer = 0;
+	exm.memory_pointer = exm.execution_memory;
+	exm.sizes_pointer = exm.sizes_of_instruction;
 	erase_exm();
 	xEventGroupSetBits(EventGroup, 0x80);
 }
 
-void exit_programing(){
+void exit_programing()
+{
 	xEventGroupClearBits(EventGroup, 0x80);
-	exm.memory_pointer = 0;
+	exm.memory_pointer = exm.execution_memory;
+	exm.sizes_pointer = exm.sizes_of_instruction;
 	xEventGroupSetBits(EventGroup, 0x40);
 }
 
-void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data){
+void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data)
+{
 	for(int i = 0; i < size_of_data; i++){
-		exm.execution_memory[exm.memory_pointer] = start_of_data[i];
+//		exm.execution_memory[exm.memory_pointer] = start_of_data[i];
+		*exm.memory_pointer = start_of_data[i];
 		exm.memory_pointer++;
+		if(exm.memory_pointer >= (exm.execution_memory + 119)){
+			exm.memory_pointer = exm.execution_memory + 118;
+			return;
+		}
+	}
+//	exm.sizes_of_instruction[exm.sizes_pointer] = size_of_data;
+	*exm.sizes_pointer = size_of_data;
+	exm.sizes_pointer++;
+	if(exm.sizes_pointer >= (exm.sizes_of_instruction + 60)){
+		exm.sizes_pointer = exm.sizes_of_instruction + 59;
+		return;
 	}
 }
 
-void erase_exm(){
+void read_from_exm()
+{
+	for(int i = 0; i < 4; i++){
+		exm.current_instruction[i] = 0;
+	}
+	for(int i = 0; i < *exm.sizes_pointer; i++){
+		exm.current_instruction[i] = *exm.memory_pointer;
+		exm.memory_pointer++;
+		if(exm.memory_pointer >= (exm.execution_memory + 119)){
+			exm.memory_pointer = exm.execution_memory + 118;
+			return ;
+		}
+	}
+	exm.sizes_pointer++;
+	if(exm.sizes_pointer >= (exm.sizes_of_instruction + 60)){
+		exm.sizes_pointer = exm.sizes_of_instruction + 59;
+		return ;
+	}
+	return ;
+}
+
+void erase_exm()
+{
 	for(int i = 0; i < sizeof(exm.execution_memory); i++){
 		exm.execution_memory[i] = 0;
 	}
+	for(int i = 0; i < sizeof(exm.sizes_of_instruction); i++){
+		exm.sizes_of_instruction[i] = 1;
+	}
 }
 
-void perform_instruction_from_exm(){
 
-}
-
-void function_of_S(){
+void function_of_S()
+{
 //	uint32_t base = 1000000/exm.start_speed_value; // Speed of HCLK is 16MHz but prescaler for TIM3 is 15 (15+1) so you receive 1MHz clock for TIM3
 //	  TIM3->ARR = base;
 //	  TIM3->CCR1 = (uint16_t) base*0.99;
@@ -545,8 +592,8 @@ void execution_from_memory(void const * argument)
   {
 	  xEventGroupWaitBits(EventGroup, 0x40, pdFALSE, pdTRUE, portMAX_DELAY);
 	  HAL_UART_Transmit(&huart1, "Execution mode", 15, 100);
-	  perform_instruction_from_exm();
-
+	  read_from_exm();
+	  HAL_UART_Transmit(&huart1, exm.current_instruction, sizeof(exm.current_instruction), 100);
 
 	  vTaskDelay(200);
   }
