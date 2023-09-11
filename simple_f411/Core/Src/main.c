@@ -41,7 +41,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim10;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
 
@@ -63,6 +64,9 @@ struct exm_type{
 	uint16_t start_speed_value;
 	uint16_t top_speed_value;
 	uint16_t ramp_value;
+	uint16_t G_sign_value;
+	uint16_t step_counter_second_part;
+	int16_t position;  // 0 is home position
 }exm;
 
 
@@ -70,14 +74,16 @@ EventGroupHandle_t EventGroup;
 /* Event Group description
  *  0x80 Programming mode for GS-200S
  *	0x40 Execution mode
+ *	0x10 Delay until...
  */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_TIM10_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM4_Init(void);
 void programing_mode(void const * argument);
 void interpreter(void const * argument);
 void uart_comunication(void const * argument);
@@ -120,6 +126,10 @@ int main(void)
 	exm.start_speed_value = 0;
 	exm.top_speed_value = 0;
 	exm.ramp_value = 0;
+	exm.G_sign_value = 0;
+	exm.step_counter_second_part = 0;
+
+	exm.position = 0; // temporary
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -140,8 +150,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM10_Init();
   MX_USART1_UART_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   USART1->CR1 |= USART_CR1_RXNEIE;
   USART1->CR1 |= USART_CR1_TE;
@@ -149,7 +160,7 @@ int main(void)
   USART1->CR1 |= USART_CR1_UE; //USART enable
 
   GPIOB->ODR &= ~GPIO_ODR_OD10; //Enable stepper driver
-  HAL_TIM_Base_Start_IT(&htim10);
+  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -250,33 +261,92 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief TIM10 Initialization Function
+  * @brief TIM3 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM10_Init(void)
+static void MX_TIM3_Init(void)
 {
 
-  /* USER CODE BEGIN TIM10_Init 0 */
+  /* USER CODE BEGIN TIM3_Init 0 */
 
-  /* USER CODE END TIM10_Init 0 */
+  /* USER CODE END TIM3_Init 0 */
 
-  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM10_Init 1 */
+  /* USER CODE BEGIN TIM3_Init 1 */
 
-  /* USER CODE END TIM10_Init 1 */
-  htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 15;
-  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 10000;
-  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim10) != HAL_OK)
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_EXTERNAL1;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR3;
+  if (HAL_TIM_SlaveConfigSynchro(&htim3, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 15;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 10000;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -284,14 +354,14 @@ static void MX_TIM10_Init(void)
   sConfigOC.Pulse = 5000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM10_Init 2 */
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM10_Init 2 */
-  HAL_TIM_MspPostInit(&htim10);
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
 
 }
 
@@ -367,7 +437,8 @@ void uart1_rx_callback(void)
 
 void enter_programing()
 {
-	xEventGroupClearBits(EventGroup, 0x40);
+//	xEventGroupClearBits(EventGroup, 0x40);
+	xEventGroupClearBits(EventGroup, 0xFFFFFF);
 	exm.memory_pointer = exm.execution_memory;
 	exm.sizes_pointer = exm.sizes_of_instruction;
 	erase_exm();
@@ -376,13 +447,15 @@ void enter_programing()
 
 void exit_programing()
 {
-	xEventGroupClearBits(EventGroup, 0x80);
+//	xEventGroupClearBits(EventGroup, 0x80);
+	xEventGroupClearBits(EventGroup, 0xFFFFFF);
 	exm.memory_pointer = exm.execution_memory;
 	exm.sizes_pointer = exm.sizes_of_instruction;
 
 	exm.start_speed_value = 0;
 	exm.top_speed_value = 0;
 	exm.ramp_value = 0;
+	exm.G_sign_value = 0;
 
 	xEventGroupSetBits(EventGroup, 0x40);
 }
@@ -470,6 +543,20 @@ void programing_mode(void const * argument)
 		case 'R':
 			uint8_t data3[4] = {'R', (uint8_t)(exm.ramp_value), (uint8_t)((exm.ramp_value>>8)), 0};
 			write_to_exm(data3, sizeof(data3));
+			break;
+		case 'G':
+			instruction_for_programing = 0;
+			  xQueueReceive(programing_queue, &instruction_for_programing, 5);
+			  switch (instruction_for_programing) {
+			  	  case '+':
+						uint8_t data4[4] = {('G'+'+'), (uint8_t)(exm.G_sign_value), (uint8_t)((exm.G_sign_value>>8)), (uint8_t)((exm.G_sign_value>>16))};
+						write_to_exm(data4, sizeof(data4));
+			  		  break;
+			  	  case '-':
+						uint8_t data5[4] = {('G'+'-'), (uint8_t)(exm.G_sign_value), (uint8_t)((exm.G_sign_value>>8)), (uint8_t)((exm.G_sign_value>>16))};
+						write_to_exm(data5, sizeof(data5));
+			  		  break;
+			  }
 			break;
 		default:
 			break;
@@ -582,6 +669,48 @@ void interpreter(void const * argument)
 			xQueueSendToBack(programing_queue, (void*)"R", 100);
 			__asm__ volatile("NOP");
 			break;
+		case 'G':
+			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
+			xQueueReceive(uart_queue_rx, &pData, 5);
+			  if ((pData & (1<<7)) == 0x80){ //Check odd parity
+				  pData &= ~(1<<7);
+			  }
+			__asm__ volatile("NOP");
+			switch (pData) {
+				case '+':
+					exm.G_sign_value = 0;
+					temp = 0;
+					for(int i = 0; i < 8; i++){
+						xQueueReceive(uart_queue_rx, &temp, 5);
+						if((temp == 13) || (temp == 0) || (i == 7)) break;
+						if ((temp & (1<<7)) == 0x80){ //Check odd parity
+							temp &= ~(1<<7);
+					    }
+						exm.G_sign_value = (exm.G_sign_value*10) + (temp - 48);
+					}
+					xQueueSendToBack(programing_queue, (void*)"G", 100);
+					xQueueSendToBack(programing_queue, (void*)"+", 100);
+					__asm__ volatile("NOP");
+					break;
+				case '-':
+					exm.G_sign_value = 0;
+					temp = 0;
+					for(int i = 0; i < 8; i++){
+						xQueueReceive(uart_queue_rx, &temp, 5);
+						if((temp == 13) || (temp == 0) || (i == 7)) break;
+						if ((temp & (1<<7)) == 0x80){ //Check odd parity
+							temp &= ~(1<<7);
+					    }
+						exm.G_sign_value = (exm.G_sign_value*10) + (temp - 48);
+					}
+					xQueueSendToBack(programing_queue, (void*)"G", 100);
+					xQueueSendToBack(programing_queue, (void*)"-", 100);
+					__asm__ volatile("NOP");
+					break;
+				default:
+					break;
+			}
+			break;
 	    case 0:
 			break;
 		default:
@@ -603,8 +732,8 @@ void interpreter(void const * argument)
 void uart_comunication(void const * argument)
 {
   /* USER CODE BEGIN uart_comunication */
-	GPIOB->ODR |= GPIO_ODR_OD9;
-	HAL_TIM_PWM_Start(&htim10, TIM_CHANNEL_1);
+//	GPIOB->ODR |= GPIO_ODR_OD9; //counterclockwise
+//	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   /* Infinite loop */
   for(;;)
   {
@@ -643,6 +772,30 @@ void execution_from_memory(void const * argument)
 			exm.ramp_value = 0;
 			exm.ramp_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8);
 			break;
+		case ('G'+'+'):
+			exm.G_sign_value = 0;
+			exm.G_sign_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8) + (exm.current_instruction[2]<<16);
+			GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
+			  HAL_TIM_Base_Start_IT(&htim4);
+			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+//			while(exm.position != exm.G_sign_value){
+//				__asm__ volatile("NOP");
+//			}
+			xEventGroupWaitBits(EventGroup, 0x50, pdFALSE, pdTRUE, portMAX_DELAY);
+			xEventGroupClearBits(EventGroup, 0x10);
+			break;
+		case ('G'+'-'):
+			exm.G_sign_value = 0;
+			exm.G_sign_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8) + (exm.current_instruction[2]<<16);
+			GPIOB->ODR |= GPIO_ODR_OD9; //counterclockwise
+			  HAL_TIM_Base_Start_IT(&htim4);
+			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+//			while(exm.position != exm.G_sign_value){
+//				__asm__ volatile("NOP");
+//			}
+			xEventGroupWaitBits(EventGroup, 0x50, pdFALSE, pdTRUE, portMAX_DELAY);
+			xEventGroupClearBits(EventGroup, 0x10);
+			break;
 		default:
 			break;
 	}
@@ -662,7 +815,41 @@ void execution_from_memory(void const * argument)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
+	if (htim->Instance == TIM3) {
+		exm.step_counter_second_part++;
+	}
 
+	if (htim->Instance == TIM4) {
+		if((xEventGroupGetBitsFromISR(EventGroup) & (1<<7)) != 0x80) { // if  Programming mode is OFF
+			switch ((GPIOB->ODR & (GPIO_ODR_OD9))) {
+				case (1<<9): //counterclockwise
+					exm.position--;
+				if(exm.position == -1*((int16_t)exm.G_sign_value)){
+				  HAL_TIM_Base_Stop_IT(&htim4);
+				HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
+				}
+					break;
+				case (0<<9): //clockwise
+					exm.position++;
+					if(exm.position == exm.G_sign_value){
+					  HAL_TIM_Base_Stop_IT(&htim4);
+					HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+					xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
+					}
+					break;
+				default:
+					break;
+			}
+		}
+//		if((xEventGroupGetBitsFromISR(EventGroup) & (1<<7)) != 0x80) { // if  Programming mode is OFF
+//			if(exm.position == exm.G_sign_value){
+//				  HAL_TIM_Base_Stop_IT(&htim4);
+//				HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+//				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
+//			}
+//		}
+	}
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM2) {
     HAL_IncTick();
