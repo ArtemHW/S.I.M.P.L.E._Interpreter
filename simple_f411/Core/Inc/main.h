@@ -59,6 +59,19 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define HOME_Pin GPIO_PIN_0
+#define HOME_GPIO_Port GPIOA
+#define HOME_EXTI_IRQn EXTI0_IRQn
+#define MOV_Pin GPIO_PIN_1
+#define MOV_GPIO_Port GPIOA
+#define MOVE_EN_Pin GPIO_PIN_2
+#define MOVE_EN_GPIO_Port GPIOA
+#define RAMP_Pin GPIO_PIN_3
+#define RAMP_GPIO_Port GPIOA
+#define RDY_Pin GPIO_PIN_4
+#define RDY_GPIO_Port GPIOA
+#define REC_Pin GPIO_PIN_0
+#define REC_GPIO_Port GPIOB
 #define ENA_stepper_Pin GPIO_PIN_10
 #define ENA_stepper_GPIO_Port GPIOB
 #define PUL_stepper_Pin GPIO_PIN_6
