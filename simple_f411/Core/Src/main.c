@@ -737,6 +737,9 @@ void uart_comunication(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	  EventBits_t res = xEventGroupGetBits(EventGroup); // EventBits_t is uint32_t
+//	  HAL_UART_Transmit(&huart1, &res, 4, 100);
+	  vTaskDelay(1500);
 
   }
   /* USER CODE END uart_comunication */
@@ -775,7 +778,12 @@ void execution_from_memory(void const * argument)
 		case ('G'+'+'):
 			exm.G_sign_value = 0;
 			exm.G_sign_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8) + (exm.current_instruction[2]<<16);
-			GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
+			if(exm.position == exm.G_sign_value) break;
+			else if(exm.position > exm.G_sign_value){
+				GPIOB->ODR |= GPIO_ODR_OD9; //counterclockwise
+			}else{
+				GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
+			}
 			  HAL_TIM_Base_Start_IT(&htim4);
 			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 //			while(exm.position != exm.G_sign_value){
@@ -787,7 +795,12 @@ void execution_from_memory(void const * argument)
 		case ('G'+'-'):
 			exm.G_sign_value = 0;
 			exm.G_sign_value = exm.current_instruction[1] + (exm.current_instruction[2]<<8) + (exm.current_instruction[2]<<16);
-			GPIOB->ODR |= GPIO_ODR_OD9; //counterclockwise
+			if(exm.position == (0-exm.G_sign_value)) break;
+			else if(exm.position > (0-exm.G_sign_value)){
+				GPIOB->ODR |= GPIO_ODR_OD9; //counterclockwise
+			}else{
+				GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
+			}
 			  HAL_TIM_Base_Start_IT(&htim4);
 			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 //			while(exm.position != exm.G_sign_value){
@@ -824,7 +837,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			switch ((GPIOB->ODR & (GPIO_ODR_OD9))) {
 				case (1<<9): //counterclockwise
 					exm.position--;
-				if(exm.position == -1*((int16_t)exm.G_sign_value)){
+				if(exm.position == 0-((int16_t)exm.G_sign_value)){
 				  HAL_TIM_Base_Stop_IT(&htim4);
 				HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
 				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);

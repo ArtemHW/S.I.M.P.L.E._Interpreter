@@ -12,7 +12,7 @@
 ../Core/Src/main.c:504:6:erase_exm	16	static
 ../Core/Src/main.c:523:6:programing_mode	48	static
 ../Core/Src/main.c:575:6:interpreter	40	static,ignoring_inline_asm
-../Core/Src/main.c:732:6:uart_comunication	16	static
-../Core/Src/main.c:752:6:execution_from_memory	24	static
-../Core/Src/main.c:814:6:HAL_TIM_PeriodElapsedCallback	16	static
-../Core/Src/main.c:865:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:732:6:uart_comunication	24	static
+../Core/Src/main.c:755:6:execution_from_memory	24	static
+../Core/Src/main.c:828:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:879:6:Error_Handler	4	static,ignoring_inline_asm

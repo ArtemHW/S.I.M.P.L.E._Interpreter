@@ -13,6 +13,6 @@
 ../Core/Src/main.c:523:6:programing_mode	7
 ../Core/Src/main.c:575:6:interpreter	50
 ../Core/Src/main.c:732:6:uart_comunication	1
-../Core/Src/main.c:752:6:execution_from_memory	6
-../Core/Src/main.c:814:6:HAL_TIM_PeriodElapsedCallback	9
-../Core/Src/main.c:865:6:Error_Handler	1
+../Core/Src/main.c:755:6:execution_from_memory	10
+../Core/Src/main.c:828:6:HAL_TIM_PeriodElapsedCallback	9
+../Core/Src/main.c:879:6:Error_Handler	1
