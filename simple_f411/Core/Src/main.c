@@ -32,7 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CK_CNT 1000000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -99,6 +99,9 @@ void exit_programing();
 void write_to_exm(uint8_t* start_of_data, uint8_t size_of_data);
 void read_from_exm();
 void erase_exm();
+void start_motor();
+void speed_regulation();
+void stop_motor();
 
 /* USER CODE END PFP */
 
@@ -201,7 +204,7 @@ int main(void)
   UART_comunicationHandle = osThreadCreate(osThread(UART_comunication), NULL);
 
   /* definition and creation of ExecutionFromMemory */
-  osThreadDef(ExecutionFromMemory, execution_from_memory, osPriorityNormal, 0, 500);
+  osThreadDef(ExecutionFromMemory, execution_from_memory, osPriorityNormal, 0, 1000);
   ExecutionFromMemoryHandle = osThreadCreate(osThread(ExecutionFromMemory), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -459,7 +462,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, MOV_Pin|RAMP_Pin|RDY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, ENA_stepper_Pin|DIR_stepper_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, ENA_stepper_Pin|S0_Pin|S1_Pin|S2_Pin
+                          |S3_Pin|DIR_stepper_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : HOME_Pin */
   GPIO_InitStruct.Pin = HOME_Pin;
@@ -492,6 +496,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : S0_Pin S1_Pin S2_Pin S3_Pin */
+  GPIO_InitStruct.Pin = S0_Pin|S1_Pin|S2_Pin|S3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : COM_IO_Pin */
+  GPIO_InitStruct.Pin = COM_IO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(COM_IO_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
@@ -592,6 +609,26 @@ void erase_exm()
 	for(int i = 0; i < sizeof(exm.sizes_of_instruction); i++){
 		exm.sizes_of_instruction[i] = 1;
 	}
+}
+
+void start_motor()
+{
+	if(exm.start_speed_value == 0) return;
+	HAL_TIM_Base_Start_IT(&htim4);
+	uint16_t temp = (uint16_t)(CK_CNT / exm.start_speed_value);
+	TIM4->ARR = temp;
+	TIM4->CCR1 = temp/2;
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+}
+
+void speed_regulation()
+{
+
+}
+
+void stop_motor()
+{
+
 }
 
 /* USER CODE END 4 */
@@ -705,10 +742,9 @@ void interpreter(void const * argument)
 			if((xEventGroupGetBits(EventGroup) & (1<<7)) != 0x80) break; // if  Programming mode is OFF
 			exm.start_speed_value = 0;
 			temp = 0;
-			for(int i = 0; i < 4; i++){
+			for(int i = 0; i < 5; i++){
 				xQueueReceive(uart_queue_rx, &temp, 5);
-				if((temp == 13) || (temp == 0) || (i == 3)) break;
-				if(i == 3) break;
+				if((temp == 13) || (temp == 0) || (i == 4)) break;
 				if ((temp & (1<<7)) == 0x80){ //Check odd parity
 					temp &= ~(1<<7);
 			    }
@@ -867,11 +903,10 @@ void execution_from_memory(void const * argument)
 			}else{
 				GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
 			}
-			  HAL_TIM_Base_Start_IT(&htim4);
-			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-//			while(exm.position != exm.G_sign_value){
-//				__asm__ volatile("NOP");
-//			}
+//			  HAL_TIM_Base_Start_IT(&htim4);
+//			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+			if(exm.start_speed_value == 0) break;
+			start_motor();
 			xEventGroupWaitBits(EventGroup, 0x50, pdFALSE, pdTRUE, portMAX_DELAY);
 			xEventGroupClearBits(EventGroup, 0x10);
 			break;
@@ -884,11 +919,10 @@ void execution_from_memory(void const * argument)
 			}else{
 				GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
 			}
-			  HAL_TIM_Base_Start_IT(&htim4);
-			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-//			while(exm.position != exm.G_sign_value){
-//				__asm__ volatile("NOP");
-//			}
+//			  HAL_TIM_Base_Start_IT(&htim4);
+//			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+			if(exm.start_speed_value == 0) break;
+			start_motor();
 			xEventGroupWaitBits(EventGroup, 0x50, pdFALSE, pdTRUE, portMAX_DELAY);
 			xEventGroupClearBits(EventGroup, 0x10);
 			break;
