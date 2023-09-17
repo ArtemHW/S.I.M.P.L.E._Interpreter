@@ -731,16 +731,9 @@ void interpreter(void const * argument)
 			__asm__ volatile("NOP");
 			switch (pData) {
 				case 'o':
-//					xEventGroupClearBits(EventGroup, 0x40);
-//					exm.memory_pointer = 0;
-//					erase_exm();
-//					xEventGroupSetBits(EventGroup, 0x80);
 					enter_programing();
 					break;
 				case 'x':
-//					xEventGroupClearBits(EventGroup, 0x80);
-//					exm.memory_pointer = 0;
-//					xEventGroupSetBits(EventGroup, 0x40);
 					exit_programing();
 					break;
 				default:
@@ -748,9 +741,6 @@ void interpreter(void const * argument)
 			}
 			break;
 	    case 'E':
-//	    	xEventGroupClearBits(EventGroup, 0x80);
-//	    	exm.memory_pointer = 0;
-//	    	xEventGroupSetBits(EventGroup, 0x40);
 	    	exit_programing();
 	    	break;
 		case 'S':
@@ -765,8 +755,6 @@ void interpreter(void const * argument)
 			    }
 				exm.start_speed_value = (exm.start_speed_value*10) + (temp - 48);
 			}
-//			uint8_t data[4] = {'S', (uint8_t)(exm.start_speed_value), (uint8_t)((exm.start_speed_value>>8)), 0};
-//			write_to_exm(data, sizeof(data));
 			xQueueSendToBack(programing_queue, (void*)"S", 100);
 			//exm.
 			__asm__ volatile("NOP");
