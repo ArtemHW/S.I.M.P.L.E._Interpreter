@@ -975,13 +975,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					break;
 			}
 		}
-//		if((xEventGroupGetBitsFromISR(EventGroup) & (1<<7)) != 0x80) { // if  Programming mode is OFF
-//			if(exm.position == exm.G_sign_value){
-//				  HAL_TIM_Base_Stop_IT(&htim4);
-//				HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
-//				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
-//			}
-//		}
 	}
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM2) {
