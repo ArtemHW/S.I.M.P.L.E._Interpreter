@@ -756,7 +756,6 @@ void interpreter(void const * argument)
 				exm.start_speed_value = (exm.start_speed_value*10) + (temp - 48);
 			}
 			xQueueSendToBack(programing_queue, (void*)"S", 100);
-			//exm.
 			__asm__ volatile("NOP");
 			break;
 		case 'T':
@@ -906,8 +905,6 @@ void execution_from_memory(void const * argument)
 			}else{
 				GPIOB->ODR &= ~GPIO_ODR_OD9; //clockwise
 			}
-//			  HAL_TIM_Base_Start_IT(&htim4);
-//			HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 			if(exm.start_speed_value == 0) break;
 			start_motor();
 			xEventGroupWaitBits(EventGroup, 0x50, pdFALSE, pdTRUE, portMAX_DELAY);
