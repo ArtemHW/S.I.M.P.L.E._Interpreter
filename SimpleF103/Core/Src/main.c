@@ -183,7 +183,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
-  uart_queue_rx = xQueueCreate(32, 1);
+  uart_queue_rx = xQueueCreate(16, 1);
   programing_queue = xQueueCreate(64, 1);
   /* USER CODE END RTOS_QUEUES */
 
@@ -529,7 +529,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void uart1_rx_callback(void)
 {
-	xQueueSendToBackFromISR(uart_queue_rx, (void*)&(USART1->DR), pdTRUE);
+	xQueueSendToBackFromISR(uart_queue_rx, (void*)&(USART1->DR), pdFALSE);
 	__asm__ volatile("NOP");
 
 }
@@ -926,7 +926,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				if(exm.position == 0-((int16_t)exm.G_sign_value)){
 				  HAL_TIM_Base_Stop_IT(&htim4);
 				HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
-				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
+				xEventGroupSetBitsFromISR(EventGroup, 0x10, pdFALSE);
 				}
 					break;
 				case (0<<9): //clockwise
@@ -934,7 +934,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					if(exm.position == exm.G_sign_value){
 					  HAL_TIM_Base_Stop_IT(&htim4);
 					HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
-					xEventGroupSetBitsFromISR(EventGroup, 0x10, pdTRUE);
+					xEventGroupSetBitsFromISR(EventGroup, 0x10, pdFALSE);
 					}
 					break;
 				default:
